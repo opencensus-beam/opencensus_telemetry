@@ -15,5 +15,9 @@ def deps do
 end
 ```
 
+## License
+
+See [LICENSE](LICENSE) file.
+
 [telemetry]: https://github.com/beam-telemetry/telemetry
 [oc]: https://github.com/census-instrumentation/opencensus-erlang
