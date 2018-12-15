@@ -5,7 +5,7 @@ defmodule Opencensus.Telemetry.MixProject do
     [
       app: :opencensus_telemetry,
       version: "0.1.0",
-      elixir: "~> 1.7",
+      elixir: "~> 1.5",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       test_coverage: [tool: ExCoveralls],
@@ -24,10 +24,10 @@ defmodule Opencensus.Telemetry.MixProject do
   defp deps do
     [
       {:telemetry, "~> 0.2.0"},
-      {:opencensus, "~> 0.6.0"},
+      {:opencensus, ">= 0.6.0 and <= 0.8.0"},
 
       # Documentation
-      {:ex_doc, ">= 0.0.0", only: [:dev, :doc]},
+      {:ex_doc, ">= 0.0.0", only: [:doc]},
 
       # Testing
       {:excoveralls, "~> 0.10.3", only: [:test]},

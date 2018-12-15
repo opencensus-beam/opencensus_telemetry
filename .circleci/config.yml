@@ -6,12 +6,16 @@ version: 2.1
 commands:
   fetch_deps:
     description: "Fetch deps, build, and cache them"
+    parameters:
+      elixir_version:
+        type: string
+        default: "any"
     steps:
       - restore_cache:
           keys:
-            - deps-v1-{{ .Branch }}-{{ .Revision }}
-            - deps-v1-{{ .Branch }}-
-            - deps-v1-
+            - deps-v1-<<parameters.elixir_version>>-{{ .Branch }}-{{ .Revision }}
+            - deps-v1-<<parameters.elixir_version>>-{{ .Branch }}-
+            - deps-v1-<<parameters.elixir_version>>-
       - run: mix do local.hex --force, local.rebar --force
       - run: mix do deps.get, deps.compile
       - save_cache:
@@ -22,12 +26,17 @@ commands:
 
 jobs:
   test:
+    parameters:
+      elixir_version:
+        type: string
+        description: Elixir version to test against to
     docker:
-      - image: elixir:1.7
+      - image: elixir:<<parameters.elixir_version>>
     working_directory: ~/repo
     steps:
       - checkout
-      - fetch_deps
+      - fetch_deps:
+          elixir_version: <<parameters.elixir_version>>
 
       - run: mkdir -p reports/exunit
       - run: mix coveralls.json
@@ -65,8 +74,18 @@ jobs:
 
 workflows:
   version: 2
-  testing:
+  lints:
     jobs:
-      - test
       - dialyzer
       - format
+  testing:
+    jobs:
+      - test:
+          name: "Elixir 1.7"
+          elixir_version: "1.7"
+      - test:
+          name: "Elixir 1.6"
+          elixir_version: "1.6"
+      - test:
+          name: "Elixir 1.5"
+          elixir_version: "1.5"
