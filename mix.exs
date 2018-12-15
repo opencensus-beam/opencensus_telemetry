@@ -6,6 +6,7 @@ defmodule Opencensus.Telemetry.MixProject do
       app: :opencensus_telemetry,
       version: "0.1.0",
       elixir: "~> 1.5",
+      elixirc_options: [warnings_as_errors: true],
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       test_coverage: [tool: ExCoveralls],
