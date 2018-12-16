@@ -1,5 +1,8 @@
 # Opencensus.Telemetry
 
+[![CircleCI](https://circleci.com/gh/opencensus-beam/opencensus_telemetry.svg?style=svg)](https://circleci.com/gh/opencensus-beam/opencensus_telemetry)
+[![codecov](https://codecov.io/gh/opencensus-beam/opencensus_telemetry/branch/master/graph/badge.svg)](https://codecov.io/gh/opencensus-beam/opencensus_telemetry)
+
 Integration between [`telemetry`][telemetry] and [`opencensus`][oc].
 
 ## Installation
