@@ -1,76 +1,73 @@
-# Elixir CircleCI 2.0 configuration file
-#
-# Check https://circleci.com/docs/2.0/language-elixir/ for more details
 version: 2.1
 
 commands:
   fetch_deps:
     description: "Fetch deps, build, and cache them"
     parameters:
-      elixir_version:
+      otp_version:
         type: string
         default: "any"
     steps:
       - restore_cache:
           keys:
-            - deps-v1-<<parameters.elixir_version>>-{{ .Branch }}-{{ .Revision }}
-            - deps-v1-<<parameters.elixir_version>>-{{ .Branch }}-
-            - deps-v1-<<parameters.elixir_version>>-
-      - run: mix do local.hex --force, local.rebar --force
-      - run: mix do deps.get, deps.compile
+            - deps-v1-<<parameters.otp_version>>-{{ checksum "rebar.lock" }}-{{ .Branch }}-{{ .Revision }}
+            - deps-v1-<<parameters.otp_version>>-{{ checksum "rebar.lock" }}-{{ .Branch }}-
+            - deps-v1-<<parameters.otp_version>>-{{ checksum "rebar.lock" }}-
+            - deps-v1-<<parameters.otp_version>>-
+      - run: rebar3 get-deps
+      - run: rebar3 as test compile --deps_only
       - save_cache:
           key: deps-v1-{{ .Branch }}-{{ .Revision }}
           paths:
-            - "deps"
-            - "_build"
+            - "~/.cache/rebar3/hex/default/packages"
+            - "_build/test/lib"
 
 jobs:
   test:
     parameters:
-      elixir_version:
+      otp_version:
         type: string
-        description: Elixir version to test against to
+        description: OTP version to test against to
     docker:
-      - image: elixir:<<parameters.elixir_version>>
+      - image: erlang:<<parameters.otp_version>>
     working_directory: ~/repo
     steps:
       - checkout
       - fetch_deps:
-          elixir_version: <<parameters.elixir_version>>
-
-      - run: mkdir -p reports/exunit
-      - run: mix coveralls.json
-      - run: bash <(curl -s https://codecov.io/bash)
+          otp_version: <<parameters.otp_version>>
+      - run: mkdir -p /tmp/ct_reports
+      - run: rebar3 do ct --cover, cover
+      - run: rebar3 covertool generate
+      - run: bash <(curl -s https://codecov.io/bash) -f _build/test/covertool/*.xml
       - store_test_results:
-          path: reports
+          path: /tmp/ct_reports
 
   dialyzer:
     docker:
-      - image: elixir:1.7
+      - image: erlang:21
     working_directory: ~/repo
     steps:
       - checkout
       - fetch_deps
-
       - restore_cache:
           keys:
-            - dialyzer-v1-{{ checksum "mix.lock" }}
+            - dialyzer-v1-{{ checksum "rebar.lock" }}
             - dialyzer-v1
-      - run: mix dialyzer --plt
+      - run: rebar3 dialyzer
       - save_cache:
-          key: dialyzer-v1-{{ checksum "mix.lock" }}
+          key: dialyzer-v1-{{ checksum "rebar.lock" }}
           paths:
             - "_build"
-      - run: mix dialyzer --halt-exit-status
+      - run: rebar3 dialyzer
 
   format:
     docker:
-      - image: elixir:1.7
+      - image: erlang:21
     working_directory: ~/repo
     steps:
       - checkout
       - fetch_deps
-      - run: mix format --check-formatted
+      - run: rebar3 lint
 
 workflows:
   version: 2
@@ -78,14 +75,12 @@ workflows:
     jobs:
       - dialyzer
       - format
+      # - inchci
   testing:
     jobs:
       - test:
-          name: "Elixir 1.7"
-          elixir_version: "1.7"
+          name: "OTP 21"
+          otp_version: "21"
       - test:
-          name: "Elixir 1.6"
-          elixir_version: "1.6"
-      - test:
-          name: "Elixir 1.5"
-          elixir_version: "1.5"
+          name: "OTP 20"
+          otp_version: "20"
