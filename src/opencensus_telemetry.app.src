@@ -1,0 +1,13 @@
+{application, opencensus_telemetry,
+ [{description, "Integration between telemetry and OpenCensus"},
+  {vsn, git},
+  {applications,
+   [kernel,
+    stdlib,
+    opencensus,
+    telemetry]},
+  {modules, []},
+
+  {maintainers, ["Łukasz Niemier"]},
+  {licenses, ["Apache 2.0"]}
+ ]}.

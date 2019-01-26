@@ -7,8 +7,13 @@ Integration between [`telemetry`][telemetry] and [`opencensus`][oc].
 
 ## Installation
 
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed
-by adding `telemetry` to your list of dependencies in `mix.exs`:
+Rebar3:
+
+```erlang
+{deps, [{opencensus_telemetry, "~> 0.1.0"}]}.
+
+
+Mix:
 
 ```elixir
 def deps do
@@ -16,6 +21,20 @@ def deps do
     {:opencensus_telemetry, "~> 0.1.0"}
   ]
 end
+```
+
+## Usage
+
+To add measure on event just run:
+
+```erlang
+oc_telemetry:attach("measure/name", [event, name], "Description", unit).
+```
+
+Or in Elixir:
+
+```elixir
+:oc_telemetry.attach("measure/name", [:event, :name], "Description", :unit)
 ```
 
 ## License
