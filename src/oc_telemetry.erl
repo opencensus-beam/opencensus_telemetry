@@ -11,8 +11,16 @@
 
 % ------------------------------------------------------------------------------
 
+%% @doc Creates measurement and attach it to the telemetry dispatcher
+%%
+%% On success it returns `{ok, Measurement}' where `Measurement' is newly
+%% created OpenCensus measurement that can be used for creating views.
+%%
+%% When there is already attached listener for given name then it will return
+%% `{error, already_registered}'.
 -spec attach(oc_stat_measure:name(),
-             telemetry:event_name(), oc_stat_measure:description(),
+             telemetry:event_name(),
+             oc_stat_measure:description(),
              oc_stat_measure:unit()) -> {ok, oc_stat_measure:measure()}
                                       | {error, already_registered}.
 
