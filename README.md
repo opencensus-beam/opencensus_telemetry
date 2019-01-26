@@ -11,6 +11,7 @@ Rebar3:
 
 ```erlang
 {deps, [{opencensus_telemetry, "~> 0.1.0"}]}.
+```
 
 
 Mix:
