@@ -6,7 +6,7 @@
 -include_lib("stdlib/include/assert.hrl").
 
 all() ->
-  [exports_to_view].
+  [attach_simple, attaching_twice_fails, tracking_simple].
 
 init_per_suite(Config) ->
   {ok, _} = application:ensure_all_started(opencensus_telemetry),
@@ -24,7 +24,7 @@ end_per_testcase(_, Config) ->
     Name = ?config(name, Config),
     telemetry:detach(Name).
 
-exports_to_view(Config) ->
+attach_simple(Config) ->
   Name = ?config(name, Config),
   EventName = [foo, bar],
   Value = 42,
@@ -40,8 +40,30 @@ exports_to_view(Config) ->
     }, oc_stat_view:export(View)),
   oc_stat_view:unsubscribe(View).
 
-registering_twice_returns_error(Config) ->
+attaching_twice_fails(Config) ->
   Name = ?config(name, Config),
 
   {ok, _Measure} = oc_telemetry:attach(Name, [foo], "Foo", foo),
   ?assertMatch({error, _}, oc_telemetry:attach(Name, [foo], "Bar", bar)).
+
+tracking_simple(_Config) ->
+  EventName = [foo, bar],
+  Value = 42,
+
+  Definition = telemetry_metric_latest(EventName, fun (V) -> V end, []),
+
+  {ok, View} = oc_telemetry:track(Definition),
+  telemetry:execute(EventName, Value, #{foo => "a", baz => "b"}),
+  ?assertMatch(#{
+     data := #{rows := [#{value := Value}]}
+    }, oc_stat_view:export(View)),
+  oc_stat_view:unsubscribe(View).
+
+telemetry_metric_latest(Name, Meta, Tags) ->
+  #{name => Name,
+    event_name => Name,
+    tags => Tags,
+    metadata => Meta,
+    unit => unit,
+    description => nil,
+    '__struct__' => 'Elixir.Telemetry.Metrics.LastValue'}.
