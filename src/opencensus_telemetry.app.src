@@ -1,6 +1,6 @@
 {application, opencensus_telemetry,
  [{description, "Integration between telemetry and OpenCensus"},
-  {vsn, git},
+  {vsn, "git"},
   {applications,
    [kernel,
     stdlib,
@@ -8,6 +8,9 @@
     telemetry]},
   {modules, []},
 
-  {maintainers, ["Łukasz Niemier"]},
-  {licenses, ["Apache 2.0"]}
+  {licenses, ["Apache 2.0"]},
+  {links, [{"GitHub", "https://github.com/opencensus-beam/opencensus_telemetry"},
+           {"OpenCensus", "https://opencensus.io"},
+           {"OpenCensus Erlang", "https://github.com/census-instrumentation/opencensus-erlang"},
+           {"OpenCensus BEAM", "https://github.com/opencensus-beam"}]}
  ]}.
