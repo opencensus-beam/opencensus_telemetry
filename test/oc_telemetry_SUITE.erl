@@ -6,7 +6,7 @@
 -include_lib("stdlib/include/assert.hrl").
 
 all() ->
-  [attach_simple, attaching_twice_fails, tracking_simple].
+  [attach_simple, attaching_twice_fails, tracking_simple, distribution].
 
 init_per_suite(Config) ->
   {ok, _} = application:ensure_all_started(opencensus_telemetry),
@@ -29,10 +29,10 @@ attach_simple(Config) ->
   EventName = [foo, bar],
   Value = 42,
 
-  {ok, Measure} = oc_telemetry:attach(Name, EventName, "Test", any),
+  {ok, Measure} = oc_telemetry:attach(Name, EventName, bar, "Test", any, fun(X) -> X end),
   {ok, View} = oc_stat_view:subscribe(Name, Measure, "Test", [baz],
                                       oc_stat_aggregation_latest),
-  telemetry:execute(EventName, Value, #{foo => "a", baz => "b"}),
+  telemetry:execute(EventName, #{bar => Value}, #{foo => "a", baz => "b"}),
   ?assertMatch(#{
      data := #{rows := [#{tags := ["b"], value := Value}]},
      name := Name,
@@ -43,27 +43,45 @@ attach_simple(Config) ->
 attaching_twice_fails(Config) ->
   Name = ?config(name, Config),
 
-  {ok, _Measure} = oc_telemetry:attach(Name, [foo], "Foo", foo),
-  ?assertMatch({error, _}, oc_telemetry:attach(Name, [foo], "Bar", bar)).
+  {ok, _Measure} = oc_telemetry:attach(Name, [foo], foo, "Foo", foo, fun(X) -> X end),
+  ?assertMatch({error, _}, oc_telemetry:attach(Name, [foo], foo, "Bar", bar, fun(X) -> X end)).
 
 tracking_simple(_Config) ->
   EventName = [foo, bar],
   Value = 42,
 
   Definition = telemetry_metric_latest(EventName, fun (V) -> V end, []),
-
   {ok, View} = oc_telemetry:track(Definition),
-  telemetry:execute(EventName, Value, #{foo => "a", baz => "b"}),
+  telemetry:execute([foo], #{value => Value,
+                             bar => Value}, #{foo => "a", baz => "b"}),
   ?assertMatch(#{
      data := #{rows := [#{value := Value}]}
     }, oc_stat_view:export(View)),
   oc_stat_view:unsubscribe(View).
 
-telemetry_metric_latest(Name, Meta, Tags) ->
-  #{name => Name,
-    event_name => Name,
-    tags => Tags,
-    metadata => Meta,
-    unit => unit,
-    description => nil,
-    '__struct__' => 'Elixir.Telemetry.Metrics.LastValue'}.
+distribution(_Config) ->
+    M = 'Elixir.Telemetry.Metrics':distribution(<<"http.request.duration">>,
+                                                [{buckets, [100, 200, 300]},
+                                                 {tags, [controller, action]}]),
+    {ok, View} = oc_telemetry:track(M),
+
+    C = 'Elixir.Telemetry.Metrics':counter(<<"http.request.requests">>,
+                                           %% I don't like this but haven't figured out a better way
+                                           [{measurement, <<"http/request/duration">>},
+                                            {tags, [controller, action]}]),
+    {ok, View2} = oc_telemetry:track(C),
+
+
+    telemetry:execute([http, request], #{duration => 100}, #{}),
+    telemetry:execute([http, request], #{duration => 300}, #{}),
+    ?assertMatch(#{
+                   data := #{rows := [#{value := 2}]}
+                  }, oc_stat_view:export(View2)),
+    ?assertMatch(#{
+                   data := #{rows := [#{value := #{buckets :=
+                                                       [{100,1},{200,0},{300,1},{infinity,0}]}}]}
+                  }, oc_stat_view:export(View)),
+    oc_stat_view:unsubscribe(View).
+
+telemetry_metric_latest(Name, TagValues, Tags) ->
+    'Elixir.Telemetry.Metrics':last_value(Name, [{tags, Tags}, {tag_values, TagValues}]).

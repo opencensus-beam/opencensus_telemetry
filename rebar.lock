@@ -1,18 +1,18 @@
 {"1.1.0",
 [{<<"counters">>,{pkg,<<"counters">>,<<"0.2.1">>},1},
  {<<"ctx">>,{pkg,<<"ctx">>,<<"0.5.0">>},1},
- {<<"jsx">>,{pkg,<<"jsx">>,<<"2.9.0">>},1},
- {<<"opencensus">>,{pkg,<<"opencensus">>,<<"0.7.0">>},0},
+ {<<"opencensus">>,{pkg,<<"opencensus">>,<<"0.9.2">>},0},
  {<<"rfc3339">>,{pkg,<<"rfc3339">>,<<"0.9.0">>},2},
- {<<"telemetry">>,{pkg,<<"telemetry">>,<<"0.3.0">>},0},
+ {<<"telemetry">>,{pkg,<<"telemetry">>,<<"0.4.0">>},0},
+ {<<"telemetry_metrics">>,{pkg,<<"telemetry_metrics">>,<<"0.3.0">>},0},
  {<<"wts">>,{pkg,<<"wts">>,<<"0.3.0">>},1}]}.
 [
 {pkg_hash,[
  {<<"counters">>, <<"AA3D97E88F92573488987193D0F48EFCE0F3B2CD1443BF4EE760BC7F99322F0C">>},
  {<<"ctx">>, <<"78E0F16712E12D707A7F34277381B8E193D7C71EAA24D37330DC02477C09EDA5">>},
- {<<"jsx">>, <<"D2F6E5F069C00266CAD52FB15D87C428579EA4D7D73A33669E12679E203329DD">>},
- {<<"opencensus">>, <<"B4C5F6A96F2BA2154570F24BB08B65D6EE0FF5B61518ACF706CA760B7696A4E1">>},
+ {<<"opencensus">>, <<"AB36B0C4E4500B976180BD088CEA7520D345711A72DF2D7188E2D7B9573A8728">>},
  {<<"rfc3339">>, <<"2075653DC9407541C84B1E15F8BDA2ABE95FB17C9694025E079583F2D19C1060">>},
- {<<"telemetry">>, <<"099A7F3CE31E4780F971B4630A3C22EC66D22208BC090FE33A2A3A6A67754A73">>},
+ {<<"telemetry">>, <<"8339BEE3FA8B91CB84D14C2935F8ECF399CCD87301AD6DA6B71C09553834B2AB">>},
+ {<<"telemetry_metrics">>, <<"5DE4037D058FAF6355835C0EC65FF19605258EE696FA9F93304A389D2D497445">>},
  {<<"wts">>, <<"5CDF22C775CB1EBAE24C326A5DB6074D753C42F4BD12A9AA47CC62D3E2C71AD1">>}]}
 ].

@@ -3,30 +3,11 @@
 % ------------------------------------------------------------------------------
 
 % Public Exports
--export([attach/4, track/1]).
+-export([attach/6, track/1]).
 
 % ------------------------------------------------------------------------------
 
--record(options, {name, filter}).
-
-% ------------------------------------------------------------------------------
-
-%% @doc Creates measurement and attach it to the telemetry dispatcher
-%%
-%% On success it returns `{ok, Measurement}' where `Measurement' is newly
-%% created OpenCensus measurement that can be used for creating views.
-%%
-%% When there is already attached listener for given name then it will return
-%% `{error, already_registered}'.
-
--spec attach(oc_stat_measure:name(),
-             telemetry:event_name(),
-             oc_stat_measure:description(),
-             oc_stat_measure:unit()) -> {ok, oc_stat_measure:measure()}
-                                        | {error, already_registered}.
-
-attach(Name, EventName, Description, Unit) ->
-  attach(Name, EventName, Description, Unit, fun (Data) -> Data end).
+-record(oc_measurement, {name, value_fun, tag_values}).
 
 %% @doc Creates measurement, view, and attaches measurement to the telemetry
 %%
@@ -42,38 +23,57 @@ attach(Name, EventName, Description, Unit) ->
 track(#{'__struct__' := Type,
         name := NormalizedName,
         event_name := EventName,
-        metadata := Metadata,
+        measurement := Measurement,
         tags := Tags,
-        description := Desc,
+        tag_values := TagValues,
+        description := Description,
         unit := Unit} = Data) ->
   Name = build_name(NormalizedName),
-  Description = Desc,
-
-  case attach(Name, EventName, Description, Unit, Metadata) of
+  case attach(Name, EventName, Measurement, Description, Unit, TagValues) of
     {ok, Measure} ->
       Aggregation = aggregation(Type, Data),
-
       oc_stat_view:subscribe(Name, Measure, Description, Tags, Aggregation);
     Error -> Error
   end.
 
 % ------------------------------------------------------------------------------
 
-attach(Name, EventName, Description, Unit, Metadata) ->
-    Measure = oc_stat_measure:new(Name, Description, Unit),
-    Options = #options{name = Name, filter = Metadata},
+attach(Name, EventName, Measurement, Description, Unit, TagValues) ->
+    case oc_stat_measure:exists(Measurement) of
+        false ->
+            Measure = oc_stat_measure:new(Name, Description, Unit),
 
-    case telemetry:attach(Name, EventName, fun handle_event/4, Options) of
-      ok -> {ok, Measure};
-      Error -> Error
+            OCMeasurement =
+                case Measurement of
+                    M when is_atom(M) ->
+                        #oc_measurement{name=Name,
+                                        value_fun=fun(Values) ->
+                                                      maps:get(Measurement, Values, undefined)
+                                                  end,
+                                        tag_values=TagValues};
+                    M when is_function(M) ->
+                        #oc_measurement{name=Name,
+                                        value_fun=M,
+                                        tag_values=TagValues}
+                end,
+            case telemetry:attach(Name, EventName, fun handle_event/4, OCMeasurement) of
+                ok -> {ok, Measure};
+                Error -> Error
+            end;
+        _ ->
+            {ok, Measurement}
     end.
 
 % Handle events send by `telemetry' application
-handle_event(_EventName, Value, Metadata,
-             #options{name = Name, filter = Filter}) ->
-  Filtered = Filter(Metadata),
-
-  ok = oc_stat:record(Filtered, Name, Value).
+handle_event(_EventName, Values, Tags, #oc_measurement{name=Name,
+                                                       value_fun=ValueFun,
+                                                       tag_values=TagValues}) ->
+    case ValueFun(Values) of
+        undefined ->
+            ok;
+        Value ->
+            ok = oc_stat:record(TagValues(Tags), Name, Value)
+    end.
 
 build_name(NormalizedName) ->
   Stringified = [atom_to_list(Atom) || Atom <- NormalizedName],
