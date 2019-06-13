@@ -89,8 +89,11 @@ oc_views(_Config) ->
     Measurements = [{[http, request], [{duration, 'http/request/latency', millisecond}]}],
     oc_telemetry:track(Measurements),
 
-    {ok, CountView} = oc_stat_view:subscribe("http/request/count", 'http/request/latency',
-                                             "number of requests received", [], oc_stat_aggregation_count),
+    {ok, CountView} = oc_stat_view:subscribe(#{name => "http/request/count",
+                                               measure => 'http/request/latency',
+                                               description => "number of requests received",
+                                               tags => [],
+                                               aggregation => oc_stat_aggregation_count}),
 
     telemetry:execute([http, request], #{duration => 100}, #{}),
     telemetry:execute([http, request], #{duration => 300}, #{}),
