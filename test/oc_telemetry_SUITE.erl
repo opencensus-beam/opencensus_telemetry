@@ -6,7 +6,8 @@
 -include_lib("stdlib/include/assert.hrl").
 
 all() ->
-  [attach_simple, attaching_twice_fails, tracking_simple, distribution].
+  [attach_simple, attaching_twice_fails, tracking_simple, distribution,
+   oc_views].
 
 init_per_suite(Config) ->
   {ok, _} = application:ensure_all_started(opencensus_telemetry),
@@ -81,7 +82,22 @@ distribution(_Config) ->
                    data := #{rows := [#{value := #{buckets :=
                                                        [{100,1},{200,0},{300,1},{infinity,0}]}}]}
                   }, oc_stat_view:export(View)),
-    oc_stat_view:unsubscribe(View).
+    oc_stat_view:unsubscribe(View),
+    oc_stat_view:unsubscribe(View2).
+
+oc_views(_Config) ->
+    Measurements = [{[http, request], [{duration, 'http/request/latency', millisecond}]}],
+    oc_telemetry:track(Measurements),
+
+    {ok, CountView} = oc_stat_view:subscribe("http/request/count", 'http/request/latency',
+                                             "number of requests received", [], oc_stat_aggregation_count),
+
+    telemetry:execute([http, request], #{duration => 100}, #{}),
+    telemetry:execute([http, request], #{duration => 300}, #{}),
+    ?assertMatch(#{
+                   data := #{rows := [#{value := 2}]}
+                  }, oc_stat_view:export(CountView)),
+    oc_stat_view:unsubscribe(CountView).
 
 telemetry_metric_latest(Name, TagValues, Tags) ->
     'Elixir.Telemetry.Metrics':last_value(Name, [{tags, Tags}, {tag_values, TagValues}]).

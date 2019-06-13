@@ -34,7 +34,18 @@ track(#{'__struct__' := Type,
       Aggregation = aggregation(Type, Data),
       oc_stat_view:subscribe(Name, Measure, Description, Tags, Aggregation);
     Error -> Error
-  end.
+  end;
+track(Events) ->
+    [track_(Event) || Event <- Events].
+
+track_({EventName, Measurements}) ->
+    Measures = measures(Measurements),
+    telemetry:attach(build_name(EventName), EventName, fun handle_event/4, Measures).
+
+measures([]) -> [];
+measures([{EventKey, Measurement, Unit} | Rest]) ->
+    oc_stat_measure:new(Measurement, <<>>, Unit),
+    [{EventKey, Measurement} | measures(Rest)].
 
 % ------------------------------------------------------------------------------
 
@@ -73,7 +84,16 @@ handle_event(_EventName, Values, Tags, #oc_measurement{name=Name,
             ok;
         Value ->
             ok = oc_stat:record(TagValues(Tags), Name, Value)
-    end.
+    end;
+handle_event(_EventName, Values, Tags, Measurements) ->
+    lists:foreach(fun({Key, Name}) ->
+                          case maps:get(Key, Values, undefined) of
+                              undefined ->
+                                  ok;
+                              Value ->
+                                  ok = oc_stat:record(Tags, Name, Value)
+                          end
+                  end, Measurements).
 
 build_name(NormalizedName) ->
   Stringified = [atom_to_list(Atom) || Atom <- NormalizedName],
