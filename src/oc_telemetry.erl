@@ -3,11 +3,23 @@
 % ------------------------------------------------------------------------------
 
 % Public Exports
--export([attach/6, track/1]).
+-export([attach/6, track/1, view/1]).
 
 % ------------------------------------------------------------------------------
 
 -record(oc_measurement, {name, value_fun, tag_values}).
+
+-spec view(Metric::map()) -> {ok, oc_stat_view:view()}
+                              | {error, term()}.
+
+view(#{'__struct__' := Type,
+       name := NormalizedName,
+       measurement := Measurement,
+       tags := Tags,
+       description := Description} = Data) ->
+    Name = build_name(NormalizedName),
+    Aggregation = aggregation(Type, Data),
+    oc_stat_view:subscribe(Name, Measurement, Description, Tags, Aggregation).
 
 %% @doc Creates measurement, view, and attaches measurement to the telemetry
 %%
