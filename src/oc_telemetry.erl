@@ -1,16 +1,18 @@
 -module(oc_telemetry).
 
-% ------------------------------------------------------------------------------
+%% -----------------------------------------------------------------------------
 
-% Public Exports
+%% Public Exports
 -export([attach/5,
          attach/6,
          track/1,
          subscribe_views/1]).
 
-% ------------------------------------------------------------------------------
+%% -----------------------------------------------------------------------------
 
--record(oc_measurement, {name, value_fun, tag_values}).
+-record(oc_measurement, {name :: atom(),
+                         value_fun :: fun((maps:map()) -> number() | undefined),
+                         tag_values :: fun((maps:map()) -> maps:map())}).
 
 %% @doc Creates measurement and attach it to the telemetry dispatcher
 %%
@@ -24,18 +26,17 @@
              term() | fun((telemetry:event_measurements()) -> number()),
              oc_stat_measure:description(),
              oc_stat_measure:unit()) -> {ok, oc_stat_measure:measure()}
-                                        | {error, already_registered}.
+                                            | {error, already_registered}.
 attach(Name, EventName, Measurement, Description, Unit) ->
     attach(Name, EventName, Measurement, Description, Unit, fun(T) -> T end).
 
--spec subscribe_views(Metrics::[map()]) -> {ok, oc_stat_view:view()}
-                                            | {error, term()}.
-
+-spec subscribe_views(Metrics::[map()]) -> [oc_stat_view:view()].
 subscribe_views(Metrics) ->
     [begin
          Name = build_name(NormalizedName),
          Aggregation = aggregation(Type, Data),
-         {ok, View} = oc_stat_view:subscribe(Name, Measurement, Description, Tags, Aggregation),
+         {ok, View} = oc_stat_view:subscribe(Name, Measurement, Description,
+                                             Tags, Aggregation),
          View
      end || #{'__struct__' := Type,
               name := NormalizedName,
@@ -52,7 +53,7 @@ subscribe_views(Metrics) ->
 %% `{error, already_registered}'.
 
 -spec track(Metric::map()) -> {ok, oc_stat_view:view()}
-                              | {error, term()}.
+                                  | {error, term()}.
 
 track(#{'__struct__' := Type,
         name := NormalizedName,
@@ -62,52 +63,62 @@ track(#{'__struct__' := Type,
         tag_values := TagValues,
         description := Description,
         unit := Unit} = Data) ->
-  Name = build_name(NormalizedName),
-  case attach(Name, EventName, Measurement, Description, Unit, TagValues) of
-    {ok, Measure} ->
-      Aggregation = aggregation(Type, Data),
-      oc_stat_view:subscribe(Name, Measure, Description, Tags, Aggregation);
-    Error -> Error
-  end;
+    Name = build_name(NormalizedName),
+    case attach(Name, EventName, Measurement, Description, Unit, TagValues) of
+        {ok, Measure} ->
+            Aggregation = aggregation(Type, Data),
+            oc_stat_view:subscribe(Name, Measure, Description,
+                                   Tags, Aggregation);
+        Error ->
+            Error
+    end;
 track(Events) ->
     [track_(Event) || Event <- Events].
 
 track_({EventName, Measurements}) ->
     Measures = measures(Measurements),
-    telemetry:attach(build_name(EventName), EventName, fun handle_event/4, Measures).
+    telemetry:attach(build_name(EventName), EventName,
+                     fun handle_event/4, Measures).
 
 measures([]) -> [];
 measures([{EventKey, Measurement, Unit} | Rest]) ->
     oc_stat_measure:new(Measurement, <<>>, Unit),
     [{EventKey, Measurement} | measures(Rest)].
 
-attach(Name, EventName, Measurement, Description, Unit, TagValues) ->
+attach(Name, EventName, Measurement, Description, Unit, TagValues)
+  when is_atom(Measurement) ->
     case oc_stat_measure:exists(Measurement) of
         false ->
-            Measure = oc_stat_measure:new(Name, Description, Unit),
-
-            OCMeasurement =
-                case Measurement of
-                    M when is_atom(M) ->
-                        #oc_measurement{name=Name,
-                                        value_fun=fun(Values) ->
-                                                      maps:get(Measurement, Values, undefined)
-                                                  end,
-                                        tag_values=TagValues};
-                    M when is_function(M) ->
-                        #oc_measurement{name=Name,
-                                        value_fun=M,
-                                        tag_values=TagValues}
-                end,
-            case telemetry:attach(Name, EventName, fun handle_event/4, OCMeasurement) of
-                ok -> {ok, Measure};
-                Error -> Error
-            end;
+            attach_(Name, EventName, Measurement, Description, Unit, TagValues);
         _ ->
             {ok, Measurement}
+    end;
+attach(Name, EventName, Measurement, Description, Unit, TagValues) ->
+    attach_(Name, EventName, Measurement, Description, Unit, TagValues).
+
+attach_(Name, EventName, Measurement, Description, Unit, TagValues) ->
+    Measure = oc_stat_measure:new(Name, Description, Unit),
+    OCMeasurement = oc_measurement(Name, Measurement, TagValues),
+    case telemetry:attach(Name, EventName,
+                          fun handle_event/4, OCMeasurement) of
+        ok ->
+            {ok, Measure};
+        Error ->
+            Error
     end.
 
-% Handle events send by `telemetry' application
+oc_measurement(Name, Measurement, TagValues) when is_atom(Measurement) ->
+    #oc_measurement{name=Name,
+                    value_fun=fun(Values) ->
+                                  maps:get(Measurement, Values, undefined)
+                              end,
+                    tag_values=TagValues};
+oc_measurement(Name, Measurement, TagValues) when is_function(Measurement) ->
+    #oc_measurement{name=Name,
+                    value_fun=Measurement,
+                    tag_values=TagValues}.
+
+%% Handle events send by `telemetry' application
 handle_event(_EventName, Values, Tags, #oc_measurement{name=Name,
                                                        value_fun=ValueFun,
                                                        tag_values=TagValues}) ->
@@ -128,24 +139,24 @@ handle_event(_EventName, Values, Tags, Measurements) ->
                   end, Measurements).
 
 build_name(NormalizedName) ->
-  Stringified = [atom_to_list(Atom) || Atom <- NormalizedName],
-  Joined = lists:join($/, Stringified),
+    Stringified = [atom_to_list(Atom) || Atom <- NormalizedName],
+    Joined = lists:join($/, Stringified),
 
-  list_to_binary(Joined).
+    list_to_binary(Joined).
 
 aggregation('Elixir.Telemetry.Metrics.Counter', _) ->
-  oc_stat_aggregation_count;
+    oc_stat_aggregation_count;
 aggregation('Elixir.Telemetry.Metrics.Sum', _) ->
-  oc_stat_aggregation_sum;
+    oc_stat_aggregation_sum;
 aggregation('Elixir.Telemetry.Metrics.LastValue', _) ->
-  oc_stat_aggregation_latest;
+    oc_stat_aggregation_latest;
 aggregation('Elixir.Telemetry.Metrics.Distribution', #{buckets := Buckets}) ->
-  {oc_stat_aggregation_distribution, [{buckets, Buckets}]}.
+    {oc_stat_aggregation_distribution, [{buckets, Buckets}]}.
 
 -ifdef(EUNIT).
 -include_lib("eunit/include/eunit.hrl").
 
 build_name_test() ->
-  ?assertEqual(<<"foo/bar">>, build_name([foo, bar])).
+    ?assertEqual(<<"foo/bar">>, build_name([foo, bar])).
 
 -endif.
