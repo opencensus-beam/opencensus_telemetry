@@ -3,23 +3,45 @@
 % ------------------------------------------------------------------------------
 
 % Public Exports
--export([attach/6, track/1, view/1]).
+-export([attach/5,
+         attach/6,
+         track/1,
+         subscribe_views/1]).
 
 % ------------------------------------------------------------------------------
 
 -record(oc_measurement, {name, value_fun, tag_values}).
 
--spec view(Metric::map()) -> {ok, oc_stat_view:view()}
-                              | {error, term()}.
+%% @doc Creates measurement and attach it to the telemetry dispatcher
+%%
+%% On success it returns `{ok, Measurement}' where `Measurement' is newly
+%% created OpenCensus measurement that can be used for creating views.
+%%
+%% When there is already attached listener for given name then it will return
+%% `{error, already_registered}'.
+-spec attach(oc_stat_measure:name(),
+             telemetry:event_name(),
+             term() | fun((telemetry:event_measurements()) -> number()),
+             oc_stat_measure:description(),
+             oc_stat_measure:unit()) -> {ok, oc_stat_measure:measure()}
+                                        | {error, already_registered}.
+attach(Name, EventName, Measurement, Description, Unit) ->
+    attach(Name, EventName, Measurement, Description, Unit, fun(T) -> T end).
 
-view(#{'__struct__' := Type,
-       name := NormalizedName,
-       measurement := Measurement,
-       tags := Tags,
-       description := Description} = Data) ->
-    Name = build_name(NormalizedName),
-    Aggregation = aggregation(Type, Data),
-    oc_stat_view:subscribe(Name, Measurement, Description, Tags, Aggregation).
+-spec subscribe_views(Metrics::[map()]) -> {ok, oc_stat_view:view()}
+                                            | {error, term()}.
+
+subscribe_views(Metrics) ->
+    [begin
+         Name = build_name(NormalizedName),
+         Aggregation = aggregation(Type, Data),
+         {ok, View} = oc_stat_view:subscribe(Name, Measurement, Description, Tags, Aggregation),
+         View
+     end || #{'__struct__' := Type,
+              name := NormalizedName,
+              measurement := Measurement,
+              tags := Tags,
+              description := Description}=Data <- Metrics].
 
 %% @doc Creates measurement, view, and attaches measurement to the telemetry
 %%
@@ -58,8 +80,6 @@ measures([]) -> [];
 measures([{EventKey, Measurement, Unit} | Rest]) ->
     oc_stat_measure:new(Measurement, <<>>, Unit),
     [{EventKey, Measurement} | measures(Rest)].
-
-% ------------------------------------------------------------------------------
 
 attach(Name, EventName, Measurement, Description, Unit, TagValues) ->
     case oc_stat_measure:exists(Measurement) of

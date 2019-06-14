@@ -7,7 +7,7 @@
 
 all() ->
   [attach_simple, attaching_twice_fails, tracking_simple, distribution,
-   oc_views].
+   oc_views, metrics_to_oc_views].
 
 init_per_suite(Config) ->
   {ok, _} = application:ensure_all_started(opencensus_telemetry),
@@ -102,5 +102,22 @@ oc_views(_Config) ->
                   }, oc_stat_view:export(CountView)),
     oc_stat_view:unsubscribe(CountView).
 
+metrics_to_oc_views(_Config) ->
+    Measurements = [{[http, request], [{duration, 'http/request/latency', millisecond}]}],
+    oc_telemetry:track(Measurements),
+
+    Count = telemetry_metric_count(<<"http.request.count">>, 'http/request/latency'),
+    [CountView] = oc_telemetry:subscribe_views([Count]),
+
+    telemetry:execute([http, request], #{duration => 100}, #{}),
+    telemetry:execute([http, request], #{duration => 300}, #{}),
+    ?assertMatch(#{
+                   data := #{rows := [#{value := 2}]}
+                  }, oc_stat_view:export(CountView)),
+    oc_stat_view:unsubscribe(CountView).
+
 telemetry_metric_latest(Name, TagValues, Tags) ->
     'Elixir.Telemetry.Metrics':last_value(Name, [{tags, Tags}, {tag_values, TagValues}]).
+
+telemetry_metric_count(Name, Measurement) ->
+    'Elixir.Telemetry.Metrics':counter(Name, [{measurement, Measurement}]).
