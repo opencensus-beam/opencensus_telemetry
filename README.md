@@ -56,16 +56,16 @@ Or in Elixir:
 Telemetry.Metrics.counter("http.requests", measurement: :'http/latency').
 ```
 
-To just add a measure on an event `oc_telemetry:attach/4` can be used:
+To just add a measure on an event `oc_telemetry:attach/5` can be used:
 
 ```erlang
-oc_telemetry:attach("measure/name", [event, name], "Description", unit).
+oc_telemetry:attach("measure/name", [event, name], key, "Description", unit).
 ```
 
 Or in Elixir:
 
 ```elixir
-:oc_telemetry.attach("measure/name", [:event, :name], "Description", :unit)
+:oc_telemetry.attach("measure/name", [:event, :name], :key, "Description", :unit)
 ```
 
 ## License
