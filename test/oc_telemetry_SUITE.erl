@@ -102,17 +102,17 @@ oc_views(_Config) ->
     oc_stat_view:unsubscribe(CountView).
 
 metrics_to_oc_views(_Config) ->
-    Measurements = [{[http, request], [{duration, "http.request.latency", millisecond}]}],
+    Measurements = [{[http2, request], [{duration, 'http2/request/latency', millisecond}]}],
     oc_telemetry:track(Measurements),
 
-    LastValue = telemetry_metric_latest(<<"http.request.latency">>),
+    LastValue = telemetry_metric_latest(<<"http2.request.latency">>),
     [_LastValueView] = oc_telemetry:subscribe_views([LastValue]),
 
-    Count = telemetry_metric_count(<<"http.request.count">>, 'latency'),
+    Count = telemetry_metric_count(<<"http2.request.count">>, 'latency'),
     [CountView] = oc_telemetry:subscribe_views([Count]),
 
-    telemetry:execute([http, request], #{duration => 100}, #{}),
-    telemetry:execute([http, request], #{duration => 300}, #{}),
+    telemetry:execute([http2, request], #{duration => 100}, #{}),
+    telemetry:execute([http2, request], #{duration => 300}, #{}),
     ?assertMatch(#{
                    data := #{rows := [#{value := 2}]}
                   }, oc_stat_view:export(CountView)),
