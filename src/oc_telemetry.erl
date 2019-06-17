@@ -34,12 +34,14 @@ attach(Name, EventName, Measurement, Description, Unit) ->
 subscribe_views(Metrics) ->
     [begin
          Name = build_name(NormalizedName),
+         Measure = binary_to_atom(build_name(EventName ++ [Measurement]), utf8),
          Aggregation = aggregation(Type, Data),
-         {ok, View} = oc_stat_view:subscribe(Name, Measurement, Description,
+         {ok, View} = oc_stat_view:subscribe(Name, Measure, Description,
                                              Tags, Aggregation),
          View
      end || #{'__struct__' := Type,
               name := NormalizedName,
+              event_name := EventName,
               measurement := Measurement,
               tags := Tags,
               description := Description}=Data <- Metrics].
@@ -86,7 +88,7 @@ measures([{EventKey, Measurement, Unit} | Rest]) ->
     [{EventKey, Measurement} | measures(Rest)].
 
 attach(Name, EventName, Measurement, Description, Unit, TagValues)
-  when is_atom(Measurement) ->
+  when is_atom(Measurement) ; is_binary(Measurement) ->
     case oc_stat_measure:exists(Measurement) of
         false ->
             attach_(Name, EventName, Measurement, Description, Unit, TagValues);
@@ -141,7 +143,6 @@ handle_event(_EventName, Values, Tags, Measurements) ->
 build_name(NormalizedName) ->
     Stringified = [atom_to_list(Atom) || Atom <- NormalizedName],
     Joined = lists:join($/, Stringified),
-
     list_to_binary(Joined).
 
 aggregation('Elixir.Telemetry.Metrics.Counter', _) ->

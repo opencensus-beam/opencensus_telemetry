@@ -51,7 +51,7 @@ tracking_simple(_Config) ->
   EventName = [foo, bar],
   Value = 42,
 
-  Definition = telemetry_metric_latest(EventName, fun (V) -> V end, []),
+  Definition = telemetry_metric_latest(EventName),
   {ok, View} = oc_telemetry:track(Definition),
   telemetry:execute([foo], #{value => Value,
                              bar => Value}, #{foo => "a", baz => "b"}),
@@ -71,7 +71,6 @@ distribution(_Config) ->
                                            [{measurement, <<"http/request/duration">>},
                                             {tags, [controller, action]}]),
     {ok, View2} = oc_telemetry:track(C),
-
 
     telemetry:execute([http, request], #{duration => 100}, #{}),
     telemetry:execute([http, request], #{duration => 300}, #{}),
@@ -103,10 +102,13 @@ oc_views(_Config) ->
     oc_stat_view:unsubscribe(CountView).
 
 metrics_to_oc_views(_Config) ->
-    Measurements = [{[http, request], [{duration, 'http/request/latency', millisecond}]}],
+    Measurements = [{[http, request], [{duration, "http.request.latency", millisecond}]}],
     oc_telemetry:track(Measurements),
 
-    Count = telemetry_metric_count(<<"http.request.count">>, 'http/request/latency'),
+    LastValue = telemetry_metric_latest(<<"http.request.latency">>),
+    [_LastValueView] = oc_telemetry:subscribe_views([LastValue]),
+
+    Count = telemetry_metric_count(<<"http.request.count">>, 'latency'),
     [CountView] = oc_telemetry:subscribe_views([Count]),
 
     telemetry:execute([http, request], #{duration => 100}, #{}),
@@ -116,8 +118,8 @@ metrics_to_oc_views(_Config) ->
                   }, oc_stat_view:export(CountView)),
     oc_stat_view:unsubscribe(CountView).
 
-telemetry_metric_latest(Name, TagValues, Tags) ->
-    'Elixir.Telemetry.Metrics':last_value(Name, [{tags, Tags}, {tag_values, TagValues}]).
+telemetry_metric_latest(Name) ->
+    'Elixir.Telemetry.Metrics':last_value(Name, []).
 
 telemetry_metric_count(Name, Measurement) ->
     'Elixir.Telemetry.Metrics':counter(Name, [{measurement, Measurement}]).
