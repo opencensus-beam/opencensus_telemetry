@@ -47,13 +47,13 @@ measurements = [{[:http, :request], [{:duration, :'http/request/latency', :milli
 A `Telemetry.Metric` struct can be used to define and subscribe to an OpenCensus View. For example a View for counting the number of HTTP requests based on the number of latency measurements taken would be:
 
 ```erlang
-'Elixir.Telemetry.Metrics':counter(<<"http.requests">>, [{measurement, 'http/latency'}]).
+'Elixir.Telemetry.Metrics':counter(<<"http.requests.count">>, [{measurement, 'latency'}]).
 ```
 
 Or in Elixir:
 
 ```elixir
-Telemetry.Metrics.counter("http.requests", measurement: :'http/latency').
+Telemetry.Metrics.counter("http.requests.count", measurement: :'latency').
 ```
 
 To just add a measure on an event `oc_telemetry:attach/5` can be used:
