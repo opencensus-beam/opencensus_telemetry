@@ -10,7 +10,7 @@
 
 %% -----------------------------------------------------------------------------
 
--record(oc_measurement, {name :: atom(),
+-record(oc_measurement, {name :: oc_stat_measure:name(),
                          value_fun :: fun((maps:map()) -> number() | undefined),
                          tag_values :: fun((maps:map()) -> maps:map())}).
 
@@ -66,13 +66,21 @@ track(#{'__struct__' := Type,
         description := Description,
         unit := Unit} = Data) ->
     Name = build_name(NormalizedName),
-    case attach(Name, EventName, Measurement, Description, Unit, TagValues) of
-        {ok, Measure} ->
+    case oc_stat_measure:exists(Measurement) of
+        false ->
+            case attach(Name, EventName, Measurement,
+                        Description, Unit, TagValues) of
+                {ok, Measure} ->
+                    Aggregation = aggregation(Type, Data),
+                    oc_stat_view:subscribe(Name, Measure, Description,
+                                           Tags, Aggregation);
+                Error ->
+                    Error
+            end;
+        _ ->
             Aggregation = aggregation(Type, Data),
-            oc_stat_view:subscribe(Name, Measure, Description,
-                                   Tags, Aggregation);
-        Error ->
-            Error
+            oc_stat_view:subscribe(Name, Measurement, Description,
+                                   Tags, Aggregation)
     end;
 track(Events) ->
     [track_(Event) || Event <- Events].
@@ -87,18 +95,7 @@ measures([{EventKey, Measurement, Unit} | Rest]) ->
     oc_stat_measure:new(Measurement, <<>>, Unit),
     [{EventKey, Measurement} | measures(Rest)].
 
-attach(Name, EventName, Measurement, Description, Unit, TagValues)
-  when is_atom(Measurement) ; is_binary(Measurement) ->
-    case oc_stat_measure:exists(Measurement) of
-        false ->
-            attach_(Name, EventName, Measurement, Description, Unit, TagValues);
-        _ ->
-            {ok, Measurement}
-    end;
 attach(Name, EventName, Measurement, Description, Unit, TagValues) ->
-    attach_(Name, EventName, Measurement, Description, Unit, TagValues).
-
-attach_(Name, EventName, Measurement, Description, Unit, TagValues) ->
     Measure = oc_stat_measure:new(Name, Description, Unit),
     OCMeasurement = oc_measurement(Name, Measurement, TagValues),
     case telemetry:attach(Name, EventName,
