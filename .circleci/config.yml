@@ -4,20 +4,23 @@ commands:
   fetch_deps:
     description: "Fetch deps, build, and cache them"
     parameters:
-      otp_version:
+      elixir_version:
         type: string
         default: "any"
     steps:
       - restore_cache:
           keys:
-            - deps-v1-<<parameters.otp_version>>-{{ checksum "rebar.lock" }}-{{ .Branch }}-{{ .Revision }}
-            - deps-v1-<<parameters.otp_version>>-{{ checksum "rebar.lock" }}-{{ .Branch }}-
-            - deps-v1-<<parameters.otp_version>>-{{ checksum "rebar.lock" }}-
-            - deps-v1-<<parameters.otp_version>>-
-      - run: rebar3 get-deps
-      - run: rebar3 as test compile --deps_only
+            - deps-v3-<<parameters.elixir_version>>-{{ checksum "rebar.lock" }}-{{ .Branch }}-{{ .Revision }}
+            - deps-v3-<<parameters.elixir_version>>-{{ checksum "rebar.lock" }}-{{ .Branch }}-
+            - deps-v3-<<parameters.elixir_version>>-{{ checksum "rebar.lock" }}-
+            - deps-v3-<<parameters.elixir_version>>-
+      - run: |
+          curl -k https://s3.amazonaws.com/rebar3-nightly/rebar3 -o rebar3
+          chmod +x rebar3
+      - run: ./rebar3 get-deps
+      - run: ./rebar3 compile --deps_only
       - save_cache:
-          key: deps-v1-{{ .Branch }}-{{ .Revision }}
+          key: deps-v3-{{ .Branch }}-{{ .Revision }}
           paths:
             - "~/.cache/rebar3/hex/default/packages"
             - "_build/test/lib"
@@ -25,49 +28,52 @@ commands:
 jobs:
   test:
     parameters:
-      otp_version:
+      elixir_version:
         type: string
-        description: OTP version to test against to
+        description: Elixir version to test against to
     docker:
-      - image: erlang:<<parameters.otp_version>>
+      - image: circleci/elixir:<<parameters.elixir_version>>
     working_directory: ~/repo
     steps:
       - checkout
       - fetch_deps:
-          otp_version: <<parameters.otp_version>>
+          elixir_version: <<parameters.elixir_version>>
       - run: mkdir -p /tmp/ct_reports
-      - run: rebar3 do ct --cover, cover
-      - run: rebar3 covertool generate
-      - run: bash <(curl -s https://codecov.io/bash) -f _build/test/covertool/*.xml
+      - run: mix local.hex --force
+      - run: mix local.rebar --force
+      - run: ./rebar3 ct # --cover, cover
+      # a bug in rebar3 causes cover to fail when rebar_mix is included.
+      # same is true for rebar3 as test compile. Add cover back when this is fixed.
+      # - run: ./rebar3 covertool generate
+      # - run: bash <(curl -s https://codecov.io/bash) -f _build/test/covertool/*.xml
       - store_test_results:
           path: /tmp/ct_reports
 
   dialyzer:
     docker:
-      - image: erlang:21
+      - image: circleci/elixir:1.8
     working_directory: ~/repo
     steps:
       - checkout
       - fetch_deps
       - restore_cache:
           keys:
-            - dialyzer-v1-{{ checksum "rebar.lock" }}
-            - dialyzer-v1
-      - run: rebar3 dialyzer
+            - dialyzer-v5-{{ checksum "rebar.lock" }}
+            - dialyzer-v5
+      - run: ./rebar3 dialyzer
       - save_cache:
-          key: dialyzer-v1-{{ checksum "rebar.lock" }}
+          key: dialyzer-v5-{{ checksum "rebar.lock" }}
           paths:
             - "_build"
-      - run: rebar3 dialyzer
 
   format:
     docker:
-      - image: erlang:21
+      - image: circleci/elixir:1.8
     working_directory: ~/repo
     steps:
       - checkout
       - fetch_deps
-      - run: rebar3 lint
+      - run: ./rebar3 lint
 
 workflows:
   version: 2
@@ -79,8 +85,5 @@ workflows:
   testing:
     jobs:
       - test:
-          name: "OTP 21"
-          otp_version: "21"
-      - test:
-          name: "OTP 20"
-          otp_version: "20"
+          name: "1.8"
+          elixir_version: "1.8"
